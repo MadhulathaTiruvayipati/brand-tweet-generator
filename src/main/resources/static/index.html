@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Brand Tweet Generator</title>
+  <style>
+    :root { --ink:#182230; --muted:#667085; --brand:#5b4bdb; --line:#e4e7ec; --bg:#f6f7fb; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Arial,sans-serif; color:var(--ink); background:var(--bg); }
+    .wrap { max-width:1000px; margin:0 auto; padding:32px 18px 56px; }
+    header { margin-bottom:24px; }
+    .eyebrow { color:var(--brand); font-size:12px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+    h1 { margin:8px 0; font-size:clamp(28px,5vw,42px); }
+    header p { color:var(--muted); margin:0; line-height:1.6; }
+    .layout { display:grid; grid-template-columns: minmax(0, 390px) minmax(0, 1fr); gap:20px; align-items:start; }
+    .panel { background:white; border:1px solid var(--line); border-radius:18px; padding:22px; box-shadow:0 6px 24px #10182808; }
+    h2 { margin:0 0 16px; font-size:20px; }
+    label { display:block; font-size:13px; font-weight:700; margin:14px 0 6px; }
+    input, select, textarea { width:100%; border:1px solid #d0d5dd; border-radius:9px; padding:11px 12px; font:inherit; font-size:14px; background:#fff; color:var(--ink); }
+    textarea { resize:vertical; min-height:85px; }
+    input:focus,select:focus,textarea:focus { outline:2px solid #d9d4ff; border-color:var(--brand); }
+    button { border:0; border-radius:10px; padding:13px 16px; font:inherit; font-weight:800; cursor:pointer; }
+    .primary { width:100%; margin-top:18px; color:white; background:var(--brand); }
+    .primary:disabled { opacity:.65; cursor:wait; }
+    .secondary { background:#f0efff; color:var(--brand); }
+    .hint { color:var(--muted); font-size:12px; line-height:1.5; margin-top:12px; }
+    #status { margin:0 0 14px; color:var(--muted); font-size:14px; }
+    #result { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; font-size:14px; }
+    #result h3 { margin-top:18px; }
+    .empty { color:var(--muted); padding:28px 0; text-align:center; line-height:1.7; }
+    .result-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    @media(max-width:800px) { .layout { grid-template-columns:1fr; } .wrap { padding-top:22px; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">AI content studio</div>
+    <h1>Brand Tweet Generator</h1>
+    <p>Understand a brand's voice and create 10 fresh tweet ideas for X.</p>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>Brand details</h2>
+      <form id="brandForm">
+        <label for="brandName">Brand name (optional)</label>
+        <input id="brandName" maxlength="120" placeholder="e.g. Nike">
+
+        <label for="industry">Industry / category (optional)</label>
+        <input id="industry" maxlength="160" placeholder="e.g. Sportswear">
+
+        <label for="objective">Campaign objective</label>
+        <select id="objective">
+          <option>Engagement</option>
+          <option>Promotion</option>
+          <option>Brand awareness</option>
+          <option>Product launch</option>
+        </select>
+
+        <label for="productDetails">Products / services and benefits</label>
+        <textarea id="productDetails" maxlength="2000" placeholder="What does the brand offer?"></textarea>
+
+        <label for="tone">Preferred tone</label>
+        <select id="tone">
+          <option>Infer from the information</option>
+          <option>Funny and witty</option>
+          <option>Professional and informative</option>
+          <option>Bold and confident</option>
+          <option>Premium and elegant</option>
+          <option>Friendly and conversational</option>
+          <option>Minimal and direct</option>
+        </select>
+
+        <label for="targetAudience">Target audience (optional)</label>
+        <input id="targetAudience" maxlength="200" placeholder="e.g. students, runners, professionals">
+
+        <label for="referencePosts">Example social posts (optional)</label>
+        <textarea id="referencePosts" maxlength="5000" placeholder="Paste a few real posts to guide the tone."></textarea>
+
+        <button class="primary" id="generateBtn" type="submit">Generate 10 Tweets</button>
+        <p class="hint">Do not include confidential information. The app uses prompt-based inference and only uses sample posts you provide; it does not automatically scrape social media.</p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="result-head">
+        <h2>Generated result</h2>
+        <button id="downloadBtn" class="secondary" type="button" disabled>Download .txt</button>
+      </div>
+      <p id="status" role="status">Fill in the form and generate your first result.</p>
+      <div id="result" class="empty">Your brand voice summary and 10 tweets will appear here.</div>
+    </section>
+  </main>
+</div>
+<script>
+  const form = document.getElementById("brandForm");
+  const button = document.getElementById("generateBtn");
+  const statusText = document.getElementById("status");
+  const result = document.getElementById("result");
+  const downloadButton = document.getElementById("downloadBtn");
+  let latestResult = "";
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      brandName: document.getElementById("brandName").value.trim(),
+      industry: document.getElementById("industry").value.trim(),
+      objective: document.getElementById("objective").value,
+      productDetails: document.getElementById("productDetails").value.trim(),
+      tone: document.getElementById("tone").value,
+      targetAudience: document.getElementById("targetAudience").value.trim(),
+      referencePosts: document.getElementById("referencePosts").value.trim()
+    };
+
+    if (!payload.brandName && !payload.industry && !payload.productDetails && !payload.referencePosts) {
+      statusText.textContent = "Please enter at least a brand name, industry, product details, or example posts.";
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Generating...";
+    statusText.textContent = "Analyzing brand voice and generating tweets. This may take a few seconds.";
+    result.className = "";
+    result.textContent = "";
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Could not generate tweets.");
+      }
+
+      latestResult = data.result || "";
+      result.textContent = latestResult;
+      statusText.textContent = "Done. Review the output before publishing.";
+      downloadButton.disabled = !latestResult;
+    } catch (error) {
+      statusText.textContent = error.message || "Something went wrong. Please try again.";
+      result.textContent = "";
+    } finally {
+      button.disabled = false;
+      button.textContent = "Generate 10 Tweets";
+    }
+  });
+
+  downloadButton.addEventListener("click", () => {
+    if (!latestResult) return;
+    const blob = new Blob([latestResult], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "brand-tweets.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+</script>
+</body>
+</html>
